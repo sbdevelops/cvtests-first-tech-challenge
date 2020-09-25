@@ -2,55 +2,128 @@ import argparse
 import cv2
 from collections.abc import Iterable
 
+
+#
+# DEFAULT CLASSES
+#
+#
+
+# Holds basic parameters defining an image
+class ImageStats:
+    def __init__(self, input_img):
+        if input_img is not None:
+            self.shape = input_img.shape
+            self.height = self.shape[0]
+            self.width = self.shape[1]
+            self.channels = self.shape[2] if len(self.shape) > 2 else 1
+            self.gray = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY) if self.channels == 3 else None
+        else:
+            print("ERROR! input_img is None!")
+
+
+# Holds a single image that is loaded upon class creation
+class PreLoadedImage:
+    mat = None
+    stats = None
+
+    def __init__(self, filepath: str):
+        self.filepath = filepath
+        self.mat = cv2.imread(self.filepath)
+        self.stats = ImageStats(self.mat)
+
+    def setup(self):
+        pass
+
+    def get_frame(self):
+        return self.mat
+
+
+# Holds a set of three images representing the preloaded ring states
+class PreLoadedRingSet:
+    stats = None
+    mat = None
+
+    def __init__(self, folder_thru_prefix: str, extension: str):
+        self.mats = [
+            cv2.imread(f"{folder_thru_prefix}{n}.{extension}") for n in (0, 1, 4)
+        ]
+        self.change_ring_image_countup(0)
+
+    def setup(self):
+        cv2.createTrackbar('Ring #', window_name, 1, 2, self.change_ring_image_countup)
+
+    def change_ring_image_countup(self, n):
+        self.mat = self.mats[n]
+        self.stats = ImageStats(self.mat)
+
+    def get_frame(self):
+        return self.mat
+
+
+# Allows for switching cameras
+class VideoFeed:
+    video_capture = None
+    stats = None
+
+    def __init__(self, default_camera_num: int):
+        self.default_camera_num = default_camera_num
+        self.change_camera(default_camera_num)
+
+    def setup(self):
+        cv2.createTrackbar('Camera #', window_name, 0, 5, self.change_camera)
+
+    def change_camera(self, num):
+        if self.video_capture is not None and self.video_capture.isOpened():
+            self.video_capture.release()
+        self.video_capture = cv2.VideoCapture(num)
+
+        first_frame = self.get_frame()
+        self.stats = ImageStats(first_frame)
+
+        if first_frame is None and num != 0:
+            cv2.setTrackbarPos('Camera #', window_name, 0)
+
+    def get_frame(self):
+        ret, image = self.video_capture.read()
+        return image
+
+
 #
 # DEFAULT VARIABLES
 #
 #
-
-# For the image
-# preloaded_image_name = 'virtualrings.png'
-preloaded_image_name = 1
+# container = PreLoadedRingSet('images/rings_A', 'jpg')
+container = VideoFeed(0)
+# preloaded_image_name = 'images/rings_B1.jpg'
+# preloaded_image_name = 1
 window_name = 'Image'
 window_name_gray = "Image (Gray)"
-num_rectangles = 4
+num_rectangles = 3
 
 # For the bounding boxes
 SPACE_DEFAULT = 0
 CHANNEL_DEFAULT = 0
-CENTER_X_DEFAULT = 721
-CENTER_Y_DEFAULT = 878
-WIDTH_DEFAULT = 526
-HEIGHT_DEFAULT = 126
+CENTER_X_DEFAULT = 663
+CENTER_Y_DEFAULT = 484
+WIDTH_DEFAULT = 229
+HEIGHT_DEFAULT = 45
 SPACING_DEFAULT = 0
 SEARCH_SPACE_DEFAULT = 5
 REFRESH_RATE_DEFAULT = 50
 
 # Names only, not to be changed
-image = None
-gray = None
-img_height = 0
-img_width = 0
-shape = None
-camera = None
+# image = None
+# gray = None
+# img_height = 0
+# img_width = 0
+# shape = None
+# camera = None
 
 
 #
 # USEFUL FUNCTIONS
 #
 #
-def redo_image_stats():
-    global image
-    global gray
-    global img_width
-    global img_height
-    global shape
-    if image is not None:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        shape = image.shape
-        img_height = shape[0]
-        img_width = shape[1]
-
-
 def constrain(num, minimum, maximum):
     return min(max(minimum, num), maximum)
 
@@ -79,7 +152,20 @@ def inverse_color_at_point(point_order_of_xy: tuple):
 
 
 def contrain_point_in_image(pt):
-    return constrain(pt[0], 0, shape[1]-1), constrain(pt[1], 0, shape[0]-1)
+    return constrain(pt[0], 0, container.stats.shape[1] - 1), constrain(pt[1], 0, container.stats.shape[0] - 1)
+
+
+# def redo_image_stats():
+#     global image
+#     global gray
+#     global img_width
+#     global img_height
+#     global shape
+#     if image is not None:
+#         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#         shape = image.shape
+#         img_height = shape[0]
+#         img_width = shape[1]
 
 
 class Rectangle:
@@ -109,35 +195,39 @@ print(keys)
 # READ THE IMAGE AND DETERMINE PROPERTIES
 #
 #
-if type(preloaded_image_name) is str:
-    using_camera_feed = False
-    image = cv2.imread(preloaded_image_name)
-    redo_image_stats()
-else:
-    using_camera_feed = True
-    camera = cv2.VideoCapture(preloaded_image_name)
-    ret, image = camera.read()
-    redo_image_stats()
+# if type(preloaded_image_name) is str:
+#     using_camera_feed = False
+#     image = cv2.imread(preloaded_image_name)
+#     redo_image_stats()
+# else:
+#     using_camera_feed = True
+#     camera = cv2.VideoCapture(preloaded_image_name)
+#     ret, image = camera.read()
+#     redo_image_stats()
 
-print(shape)
+# Create our window
+cv2.namedWindow(window_name, cv2.WINDOW_KEEPRATIO)
+
+container.setup()
+
+print(container.stats.shape)
 # cv2.imshow(window_name, image)
 # cv2.imshow(window_name_gray, gray)
 # cv2.waitKey(0)
 
-# Create our window
-cv2.namedWindow(window_name, cv2.WINDOW_KEEPRATIO)
+
 
 # Create trackbars to determine color space and channels
 cv2.createTrackbar('Space', window_name, SPACE_DEFAULT, len(keys), nothing)
 cv2.createTrackbar('Channel', window_name, CHANNEL_DEFAULT, 1, nothing)
 # Create trackbars for the center point
-cv2.createTrackbar('Center X', window_name, CENTER_X_DEFAULT, img_width, nothing)
-cv2.createTrackbar('Center Y', window_name, CENTER_Y_DEFAULT, img_height, nothing)
+cv2.createTrackbar('Center X', window_name, CENTER_X_DEFAULT, container.stats.width, nothing)
+cv2.createTrackbar('Center Y', window_name, CENTER_Y_DEFAULT, container.stats.height, nothing)
 # Create trackbar for the width, and then the ratio to determine height
-cv2.createTrackbar('Width', window_name, WIDTH_DEFAULT, img_width, nothing)
-cv2.createTrackbar('Height', window_name, HEIGHT_DEFAULT, img_height, nothing)
+cv2.createTrackbar('Width', window_name, WIDTH_DEFAULT, container.stats.width, nothing)
+cv2.createTrackbar('Height', window_name, HEIGHT_DEFAULT, container.stats.height, nothing)
 # Create trackbar for the spacing
-cv2.createTrackbar('Spacing', window_name, SPACING_DEFAULT, int(img_height / 4), nothing)
+cv2.createTrackbar('Spacing', window_name, SPACING_DEFAULT, int(container.stats.height / 4), nothing)
 # Create trackbar to determine search params
 cv2.createTrackbar('Search Space', window_name, SEARCH_SPACE_DEFAULT, 20, nothing)
 cv2.createTrackbar('Refresh Rate', window_name, REFRESH_RATE_DEFAULT, 2000, nothing)
@@ -147,9 +237,10 @@ while True:
     # Refresh image frame, get color space and channels
     #
     #
-    if using_camera_feed and camera is not None:
-        ret, image = camera.read()
-    redo_image_stats()
+    # if using_camera_feed and camera is not None:
+    #     ret, image = camera.read()
+    image = container.get_frame()
+    # redo_image_stats()
 
     # Get the desired color space, by obtaining the index from our list
     desired_space_number = cv2.getTrackbarPos('Space', window_name)
@@ -251,7 +342,7 @@ while True:
                 stddev_sum = pow((point - average), 2)
             stddev = pow(stddev_sum / (len(points) - 1), 0.5)
 
-            rect_text_start_point = (5, img_height - (30 * (n + 1)))
+            rect_text_start_point = (5, container.stats.height - (30 * (n + 1)))
             text_color = inverse_color_at_point(rect_text_start_point)
             # Put the text on our image
             cv2.putText(annotated, "Rect %d: avg%.2f stdev%.2f pts%d" % (n, average, stddev, len(points)),
@@ -263,10 +354,21 @@ while True:
     #
 
     # Determine the start point for our text
-    text_start_point = (5, img_height - 10)
+    text_start_point = (5, container.stats.height - 10)
     text_color = inverse_color_at_point(text_start_point)
     # Put the text on our image
     cv2.putText(annotated, desired_space_name, text_start_point, cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2)
+
+    rect_text_start_point = (5, 30)
+    text_color = inverse_color_at_point(rect_text_start_point)
+    # Put the text on our image
+    cv2.putText(annotated, "Eagle Robotics Team 7373",
+                rect_text_start_point, cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, 2)
+    rect_text_start_point = (5, 50)
+    text_color = inverse_color_at_point(rect_text_start_point)
+    # Put the text on our image
+    cv2.putText(annotated, "ULTIMATE GOAL CV Ring Detector Prototype",
+                rect_text_start_point, cv2.FONT_HERSHEY_SIMPLEX, 0.55, text_color, 1)
 
     # Actually show the image, and wait for a while
     cv2.imshow(window_name, annotated)
