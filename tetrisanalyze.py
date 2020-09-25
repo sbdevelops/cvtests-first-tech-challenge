@@ -1,4 +1,3 @@
-import argparse
 import cv2
 from collections.abc import Iterable
 
@@ -111,14 +110,6 @@ SPACING_DEFAULT = 0
 SEARCH_SPACE_DEFAULT = 5
 REFRESH_RATE_DEFAULT = 50
 
-# Names only, not to be changed
-# image = None
-# gray = None
-# img_height = 0
-# img_width = 0
-# shape = None
-# camera = None
-
 
 #
 # USEFUL FUNCTIONS
@@ -191,31 +182,12 @@ keys = (
 )
 print(keys)
 
-#
-# READ THE IMAGE AND DETERMINE PROPERTIES
-#
-#
-# if type(preloaded_image_name) is str:
-#     using_camera_feed = False
-#     image = cv2.imread(preloaded_image_name)
-#     redo_image_stats()
-# else:
-#     using_camera_feed = True
-#     camera = cv2.VideoCapture(preloaded_image_name)
-#     ret, image = camera.read()
-#     redo_image_stats()
-
 # Create our window
 cv2.namedWindow(window_name, cv2.WINDOW_KEEPRATIO)
 
 container.setup()
 
 print(container.stats.shape)
-# cv2.imshow(window_name, image)
-# cv2.imshow(window_name_gray, gray)
-# cv2.waitKey(0)
-
-
 
 # Create trackbars to determine color space and channels
 cv2.createTrackbar('Space', window_name, SPACE_DEFAULT, len(keys), nothing)
@@ -237,10 +209,8 @@ while True:
     # Refresh image frame, get color space and channels
     #
     #
-    # if using_camera_feed and camera is not None:
-    #     ret, image = camera.read()
+
     image = container.get_frame()
-    # redo_image_stats()
 
     # Get the desired color space, by obtaining the index from our list
     desired_space_number = cv2.getTrackbarPos('Space', window_name)
